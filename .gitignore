@@ -60,4 +60,7 @@ test_integration.go
 
 # Text documentation files
 *.txt
+
+# BadgerDB data directories
 ltt-data/
+search-demo-data/

@@ -92,9 +92,9 @@ func NewStore(config Config) (*Store, error) {
 	return s, nil
 }
 
-// Store saves a span to persistent storage
+// Store saves a span to persistent storage with secondary indexes
 func (s *Store) Store(span *protocol.SpanMessage) error {
-	// Create key: timestamp + trace_id + span_id for time-based ordering
+	// Create primary key: timestamp + trace_id + span_id for time-based ordering
 	key := makeKey(span)
 
 	// Serialize span to bytes (EncodeTo includes 4-byte length prefix)
@@ -112,10 +112,12 @@ func (s *Store) Store(span *protocol.SpanMessage) error {
 	}
 	payload := data[4:] // Skip length prefix
 
-	// Write to BadgerDB with TTL
+	// Generate secondary index keys
+	idxKeys := indexKeys(span)
+
+	// Write span + indexes atomically with TTL
 	err := s.db.Update(func(txn *badger.Txn) error {
-		entry := badger.NewEntry(key, payload).WithTTL(s.config.TTL)
-		return txn.SetEntry(entry)
+		return storeWithIndexes(txn, key, payload, idxKeys, s.config.TTL)
 	})
 
 	if err != nil {
@@ -175,7 +177,7 @@ func (s *Store) GetByTraceID(traceID [16]byte) ([]*protocol.SpanMessage, error) 
 	return spans, nil
 }
 
-// GetRecent retrieves the N most recent spans
+// GetRecent retrieves the N most recent spans (excludes index entries)
 func (s *Store) GetRecent(limit int) ([]*protocol.SpanMessage, error) {
 	var spans []*protocol.SpanMessage
 
@@ -190,6 +192,12 @@ func (s *Store) GetRecent(limit int) ([]*protocol.SpanMessage, error) {
 		count := 0
 		for it.Rewind(); it.Valid() && count < limit; it.Next() {
 			item := it.Item()
+			key := item.Key()
+
+			// Skip index entries (they start with "idx:")
+			if len(key) >= 4 && string(key[:4]) == "idx:" {
+				continue
+			}
 
 			err := item.Value(func(val []byte) error {
 				span, err := protocol.DecodePayload(val)
@@ -216,7 +224,7 @@ func (s *Store) GetRecent(limit int) ([]*protocol.SpanMessage, error) {
 	return spans, nil
 }
 
-// GetByTimeRange retrieves spans within a time range
+// GetByTimeRange retrieves spans within a time range (excludes index entries)
 func (s *Store) GetByTimeRange(start, end time.Time) ([]*protocol.SpanMessage, error) {
 	var spans []*protocol.SpanMessage
 
@@ -234,6 +242,11 @@ func (s *Store) GetByTimeRange(start, end time.Time) ([]*protocol.SpanMessage, e
 		for it.Seek(startKey); it.Valid(); it.Next() {
 			item := it.Item()
 			key := item.Key()
+
+			// Skip index entries (they start with "idx:")
+			if len(key) >= 4 && string(key[:4]) == "idx:" {
+				continue
+			}
 
 			// Stop if we've passed the end time
 			if compareKeys(key, endKey) > 0 {
@@ -263,7 +276,7 @@ func (s *Store) GetByTimeRange(start, end time.Time) ([]*protocol.SpanMessage, e
 	return spans, nil
 }
 
-// Count returns the approximate number of spans stored
+// Count returns the approximate number of spans stored (excludes indexes)
 func (s *Store) Count() (int, error) {
 	count := 0
 
@@ -275,6 +288,13 @@ func (s *Store) Count() (int, error) {
 		defer it.Close()
 
 		for it.Rewind(); it.Valid(); it.Next() {
+			key := it.Item().Key()
+
+			// Skip index entries (they start with "idx:")
+			if len(key) >= 4 && string(key[:4]) == "idx:" {
+				continue
+			}
+
 			count++
 		}
 
@@ -286,6 +306,11 @@ func (s *Store) Count() (int, error) {
 	}
 
 	return count, nil
+}
+
+// DB returns the underlying BadgerDB instance for advanced queries
+func (s *Store) DB() *badger.DB {
+	return s.db
 }
 
 // Close closes the store and releases resources
