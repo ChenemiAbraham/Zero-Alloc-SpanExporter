@@ -42,3 +42,21 @@ build/
 # Profiling
 cpu.prof
 mem.prof
+
+# Ignore all markdown files by default
+*.md
+
+# But keep these essential ones
+!README.md
+!CLAUDE.md
+
+# Windows batch scripts (use Makefile or direct commands instead)
+*.bat
+
+# Test files for local development
+test_smoke.go
+test_e2e.go
+test_integration.go
+
+# Text documentation files
+*.txt

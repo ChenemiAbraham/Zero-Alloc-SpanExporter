@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -396,4 +397,22 @@ func attributeValue(v attribute.Value) interface{} {
 	default:
 		return v.AsString()
 	}
+}
+
+// Buffer pool for efficient serialization
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+// NewBuffer gets a buffer from the pool
+func NewBuffer() *bytes.Buffer {
+	return bufferPool.Get().(*bytes.Buffer)
+}
+
+// PutBuffer returns a buffer to the pool
+func PutBuffer(buf *bytes.Buffer) {
+	buf.Reset()
+	bufferPool.Put(buf)
 }

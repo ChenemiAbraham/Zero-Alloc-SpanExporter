@@ -11,6 +11,7 @@ import (
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/internal/ringbuf"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/metrics"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/storage"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -34,6 +35,10 @@ type Config struct {
 	// FlushInterval is how often to flush batched spans
 	// Default: 100ms
 	FlushInterval time.Duration
+
+	// Storage configuration (optional)
+	// If nil, persistence is disabled
+	Storage *storage.Config
 }
 
 // DefaultConfig returns a config with sensible defaults
@@ -58,6 +63,7 @@ type Exporter struct {
 	transport *SocketTransport
 	bufPool   *BufferPool
 	ringBuf   *ringbuf.RingBuffer
+	store     *storage.Store // Optional persistent storage
 
 	// Worker goroutine coordination
 	ctx    context.Context
@@ -109,6 +115,16 @@ func New(config Config) (*Exporter, error) {
 		ctx:       ctx,
 		cancel:    cancel,
 		metrics:   metrics.GetGlobal(),
+	}
+
+	// Initialize persistent storage if configured
+	if config.Storage != nil {
+		store, err := storage.NewStore(*config.Storage)
+		if err != nil {
+			transport.Close()
+			return nil, fmt.Errorf("failed to create storage: %w", err)
+		}
+		exp.store = store
 	}
 
 	// Start background worker
@@ -191,13 +207,23 @@ func (e *Exporter) worker() {
 	}
 }
 
-// flushBatch writes a batch of spans to the socket
+// flushBatch writes a batch of spans to the socket and optionally to persistent storage
 func (e *Exporter) flushBatch(batch []*protocol.SpanMessage) {
 	if len(batch) == 0 {
 		return
 	}
 
 	start := time.Now()
+
+	// Write to persistent storage first (write-through cache)
+	if e.store != nil {
+		for _, msg := range batch {
+			if err := e.store.Store(msg); err != nil {
+				// Log error but continue - don't fail export if storage fails
+				atomic.AddUint64(&e.failedWrites, 1)
+			}
+		}
+	}
 
 	// Get buffer from pool
 	buf := e.bufPool.Get()
@@ -251,6 +277,13 @@ func (e *Exporter) Shutdown(ctx context.Context) error {
 		// Close transport
 		if e.transport != nil {
 			e.transport.Close()
+		}
+
+		// Close persistent storage
+		if e.store != nil {
+			if storeErr := e.store.Close(); storeErr != nil && err == nil {
+				err = storeErr
+			}
 		}
 	})
 
@@ -322,4 +355,9 @@ func (e *Exporter) GetBufferUsage() float64 {
 	bufSize := int(e.config.BufferSize)
 	used := e.ringBuf.Len()
 	return float64(used) / float64(bufSize)
+}
+
+// GetStore returns the persistent storage (may be nil)
+func (e *Exporter) GetStore() *storage.Store {
+	return e.store
 }
