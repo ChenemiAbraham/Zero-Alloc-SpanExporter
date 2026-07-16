@@ -1,0 +1,141 @@
+╔══════════════════════════════════════════════════════════════╗
+║         HOW TO RUN LOCAL TRACE TAP - STEP BY STEP           ║
+╚══════════════════════════════════════════════════════════════╝
+
+🔴 ISSUE: You're in the wrong directory!
+
+Current location: C:\Users\Han
+Needed location: C:\Users\Han\OneDrive\Documents\ZasExporter-Go
+
+═══════════════════════════════════════════════════════════════
+
+✅ SOLUTION - Copy and paste these commands:
+
+1. Navigate to the project:
+   cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+
+2. Verify you're in the right place:
+   dir test_e2e.go
+   # Should show the file
+
+3. Run the test:
+   go run test_e2e.go
+
+═══════════════════════════════════════════════════════════════
+
+📋 COMPLETE COMMAND SEQUENCE (PowerShell):
+
+cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+go run test_e2e.go
+
+═══════════════════════════════════════════════════════════════
+
+🎯 WHAT SHOULD HAPPEN:
+
+You'll see:
+  🧪 LTT End-to-End Test
+  =====================
+  
+  1. Creating exporter... ✅ Exporter created
+  2. Setting up OpenTelemetry... ✅ Tracer ready
+  3. Generating test traces...
+     💡 Start the TUI viewer in another terminal: ./ltt
+     💡 Press Ctrl+C to stop
+  
+  Traces: 1 | Exported: 2 | Dropped: 0 | Buffer: 0.0%
+
+═══════════════════════════════════════════════════════════════
+
+🖥️ THEN - Open a SECOND terminal and run:
+
+cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+.\ltt.exe
+
+Or on Git Bash:
+./ltt
+
+═══════════════════════════════════════════════════════════════
+
+🎬 VISUAL GUIDE:
+
+Terminal 1 (Left):              Terminal 2 (Right):
+┌────────────────────────┐     ┌────────────────────────┐
+│ > cd "C:\Users\...\    │     │ > cd "C:\Users\...\    │
+│   ZasExporter-Go"      │     │   ZasExporter-Go"      │
+│                        │     │                        │
+│ > go run test_e2e.go   │     │ > .\ltt.exe           │
+│                        │     │                        │
+│ Traces: 5 | ...        │     │ [TUI showing traces]  │
+│ Traces: 10 | ...       │     │ GET /api/users/:id    │
+│ Traces: 15 | ...       │     │   └─ DB Query         │
+└────────────────────────┘     └────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+
+🐛 TROUBLESHOOTING:
+
+Error: "cannot find file"
+Fix: Make sure you're in the project directory!
+     cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+
+Error: "connection refused"  
+Fix: Run test_e2e.go FIRST, then ltt in another terminal
+
+Error: "ltt.exe not found"
+Fix: Build it first: go build -o ltt.exe .\cmd\ltt
+
+═══════════════════════════════════════════════════════════════
+
+📝 QUICK COPY-PASTE (PowerShell):
+
+# Terminal 1
+cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+go run test_e2e.go
+
+# Terminal 2 (open a new PowerShell window)
+cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+.\ltt.exe
+
+═══════════════════════════════════════════════════════════════
+
+🚀 ALTERNATIVE - Run integration test first (single terminal):
+
+cd "C:\Users\Han\OneDrive\Documents\ZasExporter-Go"
+go run test_integration.go
+
+This will verify everything works WITHOUT needing 2 terminals!
+
+═══════════════════════════════════════════════════════════════
+
+✅ EXPECTED OUTPUT (integration test):
+
+🧪 LTT Integration Test
+=======================
+
+1. Starting exporter... ✅ PASSED
+2. Creating tracer... ✅ PASSED
+3. Connecting as client... ✅ PASSED
+4. Testing span flow... ✅ PASSED
+5. Testing multiple spans... ✅ PASSED
+
+╔══════════════════════════════════════════╗
+║     INTEGRATION TEST RESULTS             ║
+╚══════════════════════════════════════════╝
+
+✅ Exporter working
+✅ Socket communication working
+✅ Protocol encode/decode working
+✅ End-to-end flow functional
+
+🎉 Ready to run full TUI!
+
+═══════════════════════════════════════════════════════════════
+
+💡 PRO TIP:
+
+Start with integration test to verify everything works:
+  go run test_integration.go
+
+Then try the full demo with 2 terminals!
+
+═══════════════════════════════════════════════════════════════

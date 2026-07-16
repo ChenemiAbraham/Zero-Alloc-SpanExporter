@@ -1,0 +1,98 @@
+ZasExporter-Go/
+│
+├── cmd/
+│   └── ltt/
+│       └── main.go                      # TUI viewer CLI entry point
+│
+├── pkg/
+│   ├── exporter/
+│   │   ├── exporter.go                  # Zero-allocation OTEL SpanExporter
+│   │   ├── exporter_test.go             # Benchmarks & unit tests
+│   │   ├── socket.go                    # Unix socket / named pipe transport
+│   │   └── pool.go                      # sync.Pool for buffer reuse
+│   │
+│   ├── protocol/
+│   │   └── span.go                      # Binary wire protocol
+│   │
+│   └── viewer/
+│       ├── model.go                     # Bubbletea application model
+│       ├── trace.go                     # Hierarchical trace tree
+│       └── waterfall.go                 # ASCII waterfall renderer
+│
+├── internal/
+│   └── ringbuf/
+│       ├── ringbuf.go                   # Lock-free SPSC ring buffer
+│       └── ringbuf_test.go              # Concurrency tests
+│
+├── examples/
+│   └── simple/
+│       └── main.go                      # Example traced application
+│
+├── docs/
+│   ├── README.md                        # User-facing introduction
+│   ├── CLAUDE.md                        # Developer documentation
+│   ├── PROJECT_PLAN.md                  # 6-week implementation roadmap
+│   ├── ARCHITECTURE.md                  # Deep technical architecture
+│   ├── QUICKSTART.md                    # Get started in 3 minutes
+│   └── BUILD_STATUS.txt                 # Current project status
+│
+├── go.mod                               # Go module definition
+├── go.sum                               # Dependency checksums
+├── Makefile                             # Build automation
+├── .gitignore                           # Git ignore rules
+└── PROJECT_STRUCTURE.txt                # This file
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY FILES BY ROLE:
+
+🏗️ ARCHITECTURE & DESIGN
+├── ARCHITECTURE.md          - Deep dive into system design
+├── CLAUDE.md                - Developer guide & conventions
+└── PROJECT_PLAN.md          - 6-week implementation roadmap
+
+🚀 GETTING STARTED
+├── README.md                - Project introduction
+├── QUICKSTART.md            - 3-minute quick start
+└── examples/simple/main.go  - Working example app
+
+💻 CORE IMPLEMENTATION
+├── pkg/exporter/exporter.go - Zero-allocation exporter (HOT PATH)
+├── internal/ringbuf/        - Lock-free ring buffer
+├── pkg/protocol/span.go     - Wire protocol
+└── pkg/exporter/socket.go   - IPC transport
+
+🖥️ TUI VIEWER
+├── cmd/ltt/main.go          - CLI entry point
+├── pkg/viewer/model.go      - Bubbletea application
+├── pkg/viewer/trace.go      - Trace tree structure
+└── pkg/viewer/waterfall.go  - ASCII rendering
+
+🧪 TESTING
+├── pkg/exporter/*_test.go   - Exporter benchmarks
+├── internal/ringbuf/*_test.go - Ring buffer tests
+└── Makefile (test targets)  - make test, make bench
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE STATISTICS:
+
+Total Files:        21
+Go Source Files:    13
+Test Files:         2
+Documentation:      6
+Build Files:        2 (Makefile, go.mod)
+
+Estimated LOC:      ~2,500 lines (excluding tests)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CRITICAL PATH (for implementation):
+
+1. pkg/protocol/span.go          - Implement EncodeTo/DecodeFrom
+2. pkg/exporter/socket.go        - Test socket read/write
+3. pkg/viewer/model.go           - Implement readSpans goroutine
+4. examples/simple/main.go       - Test end-to-end flow
+5. pkg/exporter/exporter_test.go - Verify benchmarks hit targets
+
+═══════════════════════════════════════════════════════════════════════════════
