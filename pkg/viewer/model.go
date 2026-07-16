@@ -2,6 +2,7 @@ package viewer
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -21,12 +22,14 @@ type Model struct {
 	filter    TraceFilter
 	filtering bool
 
-	socketPath string
-	reader     *exporter.SocketReader
-	ctx        context.Context
-	cancel     context.CancelFunc
-	spanChan   chan *protocol.SpanMessage
-	program    *tea.Program
+	socketPath      string
+	reader          *exporter.SocketReader
+	ctx             context.Context
+	cancel          context.CancelFunc
+	spanChan        chan *protocol.SpanMessage
+	program         *tea.Program
+	connectionError error
+	connected       bool
 }
 
 // NewModel creates a new TUI model
@@ -77,8 +80,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case errorMsg:
-		// Handle error (could show in status bar)
+		m.connectionError = msg.err
+		m.connected = false
 		return m, tickCmd()
+
+	case connectedMsg:
+		m.connected = true
+		m.connectionError = nil
+		return m, nil
 	}
 
 	return m, nil
@@ -88,6 +97,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) View() string {
 	// Header
 	view := m.renderer.RenderHeader() + "\n\n"
+
+	// Show connection status if not connected
+	if !m.connected && m.connectionError != nil {
+		view += fmt.Sprintf("❌ Connection failed: %v\n", m.connectionError)
+		view += fmt.Sprintf("Retrying connection to %s...\n", m.socketPath)
+	} else if !m.connected {
+		view += fmt.Sprintf("⏳ Connecting to %s...\n", m.socketPath)
+	}
 
 	// Waterfall
 	lines := m.renderer.RenderTree(m.tree)
@@ -218,7 +235,7 @@ func (m *Model) connectSocket() tea.Cmd {
 
 		go m.readSpans()
 
-		return nil
+		return connectedMsg{}
 	}
 }
 
@@ -272,6 +289,8 @@ type spanReceivedMsg struct {
 type errorMsg struct {
 	err error
 }
+
+type connectedMsg struct{}
 
 type tickMsg time.Time
 
