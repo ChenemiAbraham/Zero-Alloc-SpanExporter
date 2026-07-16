@@ -11,6 +11,7 @@ import (
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/internal/ringbuf"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/metrics"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/sampler"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/storage"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -39,6 +40,10 @@ type Config struct {
 	// Storage configuration (optional)
 	// If nil, persistence is disabled
 	Storage *storage.Config
+
+	// Sampler configuration (optional)
+	// If nil, all spans are exported (no sampling)
+	Sampler *sampler.Config
 }
 
 // DefaultConfig returns a config with sensible defaults
@@ -63,7 +68,8 @@ type Exporter struct {
 	transport *SocketTransport
 	bufPool   *BufferPool
 	ringBuf   *ringbuf.RingBuffer
-	store     *storage.Store // Optional persistent storage
+	store     *storage.Store     // Optional persistent storage
+	sampler   sampler.Sampler    // Optional sampler
 
 	// Worker goroutine coordination
 	ctx    context.Context
@@ -74,6 +80,7 @@ type Exporter struct {
 	exportedSpans uint64
 	droppedSpans  uint64
 	failedWrites  uint64
+	sampledSpans  uint64 // Spans rejected by sampler
 	metrics       *metrics.Metrics
 
 	// Ensure single shutdown
@@ -127,6 +134,11 @@ func New(config Config) (*Exporter, error) {
 		exp.store = store
 	}
 
+	// Initialize sampler if configured
+	if config.Sampler != nil {
+		exp.sampler = sampler.NewSampler(*config.Sampler)
+	}
+
 	// Start background worker
 	exp.wg.Add(1)
 	go exp.worker()
@@ -148,6 +160,14 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) 
 		// Convert to wire format (this allocates a SpanMessage)
 		// TODO: Pool SpanMessage objects as well
 		msg := protocol.FromReadOnlySpan(span)
+
+		// Apply sampling decision if sampler is configured
+		if e.sampler != nil {
+			if e.sampler.ShouldSample(msg) == sampler.Drop {
+				atomic.AddUint64(&e.sampledSpans, 1)
+				continue
+			}
+		}
 
 		// Try to push to ring buffer (non-blocking)
 		if !e.ringBuf.TryPush(msg) {
@@ -300,7 +320,9 @@ type Stats struct {
 	ExportedSpans uint64
 	DroppedSpans  uint64
 	FailedWrites  uint64
+	SampledSpans  uint64  // Spans rejected by sampler
 	BufferUsage   float64
+	SamplingRate  float64 // Current sampling rate (0-1)
 }
 
 // GetStats returns current statistics
@@ -308,12 +330,25 @@ func (e *Exporter) GetStats() Stats {
 	bufSize := int(e.config.BufferSize)
 	used := e.ringBuf.Len()
 
-	return Stats{
+	stats := Stats{
 		ExportedSpans: atomic.LoadUint64(&e.exportedSpans),
 		DroppedSpans:  atomic.LoadUint64(&e.droppedSpans) + e.ringBuf.DroppedCount(),
 		FailedWrites:  atomic.LoadUint64(&e.failedWrites),
+		SampledSpans:  atomic.LoadUint64(&e.sampledSpans),
 		BufferUsage:   float64(used) / float64(bufSize) * 100,
 	}
+
+	// Calculate sampling rate if sampler is active
+	if e.sampler != nil {
+		total := stats.ExportedSpans + stats.SampledSpans
+		if total > 0 {
+			stats.SamplingRate = float64(stats.ExportedSpans) / float64(total)
+		}
+	} else {
+		stats.SamplingRate = 1.0 // No sampling = 100%
+	}
+
+	return stats
 }
 
 // metricsCollector periodically updates resource metrics

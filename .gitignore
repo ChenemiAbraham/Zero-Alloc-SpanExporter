@@ -60,3 +60,4 @@ test_integration.go
 
 # Text documentation files
 *.txt
+ltt-data/
