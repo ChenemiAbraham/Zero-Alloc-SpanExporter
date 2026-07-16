@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/metrics"
 )
 
 // SocketTransport handles low-level socket communication
@@ -66,6 +68,8 @@ func (st *SocketTransport) createSocket() error {
 
 // acceptConnections accepts incoming connections (typically one TUI viewer)
 func (st *SocketTransport) acceptConnections() {
+	m := metrics.GetGlobal()
+
 	for {
 		conn, err := st.listener.Accept()
 		if err != nil {
@@ -85,8 +89,10 @@ func (st *SocketTransport) acceptConnections() {
 		// Close previous connection if exists
 		if st.conn != nil {
 			st.conn.Close()
+			m.RecordDisconnection()
 		}
 		st.conn = conn
+		m.RecordConnection()
 		st.mu.Unlock()
 	}
 }
@@ -116,6 +122,7 @@ func (st *SocketTransport) Write(data []byte) error {
 		if st.conn == conn {
 			st.conn.Close()
 			st.conn = nil
+			metrics.GetGlobal().RecordDisconnection()
 		}
 		st.mu.Unlock()
 		return err
@@ -204,4 +211,11 @@ func (sr *SocketReader) ReadMessage(ctx context.Context) ([]byte, error) {
 // Close closes the socket reader
 func (sr *SocketReader) Close() error {
 	return sr.conn.Close()
+}
+
+// IsConnected returns whether a client is currently connected
+func (st *SocketTransport) IsConnected() bool {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	return st.conn != nil && !st.closed
 }

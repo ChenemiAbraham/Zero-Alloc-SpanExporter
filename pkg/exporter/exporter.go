@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/internal/ringbuf"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/metrics"
 	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -67,6 +68,7 @@ type Exporter struct {
 	exportedSpans uint64
 	droppedSpans  uint64
 	failedWrites  uint64
+	metrics       *metrics.Metrics
 
 	// Ensure single shutdown
 	shutdownOnce sync.Once
@@ -106,11 +108,16 @@ func New(config Config) (*Exporter, error) {
 		ringBuf:   ringbuf.NewRingBuffer(config.BufferSize),
 		ctx:       ctx,
 		cancel:    cancel,
+		metrics:   metrics.GetGlobal(),
 	}
 
 	// Start background worker
 	exp.wg.Add(1)
 	go exp.worker()
+
+	// Start metrics collector goroutine
+	exp.wg.Add(1)
+	go exp.metricsCollector()
 
 	return exp, nil
 }
@@ -118,6 +125,9 @@ func New(config Config) (*Exporter, error) {
 // ExportSpans implements the trace.SpanExporter interface
 // This is the HOT PATH - must be zero-allocation and non-blocking
 func (e *Exporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+	count := len(spans)
+	e.metrics.RecordSpanReceived(count)
+
 	for _, span := range spans {
 		// Convert to wire format (this allocates a SpanMessage)
 		// TODO: Pool SpanMessage objects as well
@@ -127,6 +137,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) 
 		if !e.ringBuf.TryPush(msg) {
 			// Buffer full, increment dropped counter
 			atomic.AddUint64(&e.droppedSpans, 1)
+			e.metrics.RecordSpanDropped(1)
 			continue
 		}
 
@@ -186,23 +197,35 @@ func (e *Exporter) flushBatch(batch []*protocol.SpanMessage) {
 		return
 	}
 
+	start := time.Now()
+
 	// Get buffer from pool
 	buf := e.bufPool.Get()
 	defer e.bufPool.Put(buf)
 
 	// Serialize batch
+	encodeStart := time.Now()
+	encodedCount := 0
 	for _, msg := range batch {
 		if err := msg.EncodeTo(buf); err != nil {
 			// Log error but continue
 			atomic.AddUint64(&e.failedWrites, 1)
+			e.metrics.RecordSpanFailed(1)
 			continue
 		}
+		encodedCount++
 	}
+	e.metrics.RecordEncodeDuration(time.Since(encodeStart))
 
 	// Write to socket
 	if err := e.transport.Write(buf.Bytes()); err != nil {
 		atomic.AddUint64(&e.failedWrites, 1)
+		e.metrics.RecordSpanFailed(encodedCount)
+	} else {
+		e.metrics.RecordSpanExported(encodedCount)
 	}
+
+	e.metrics.RecordExportDuration(time.Since(start))
 }
 
 // Shutdown gracefully shuts down the exporter
@@ -258,4 +281,45 @@ func (e *Exporter) GetStats() Stats {
 		FailedWrites:  atomic.LoadUint64(&e.failedWrites),
 		BufferUsage:   float64(used) / float64(bufSize) * 100,
 	}
+}
+
+// metricsCollector periodically updates resource metrics
+func (e *Exporter) metricsCollector() {
+	defer e.wg.Done()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+
+		case <-ticker.C:
+			// Update buffer usage
+			bufSize := int(e.config.BufferSize)
+			used := e.ringBuf.Len()
+			e.metrics.SetBufferUsage(used, bufSize)
+
+			// Update goroutine count
+			e.metrics.SetGoroutines(runtime.NumGoroutine())
+
+			// Update memory usage
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			e.metrics.SetMemoryUsage(m.Alloc)
+		}
+	}
+}
+
+// IsConnected returns whether the socket is connected
+func (e *Exporter) IsConnected() bool {
+	return e.transport != nil && e.transport.IsConnected()
+}
+
+// GetBufferUsage returns current buffer usage as a percentage
+func (e *Exporter) GetBufferUsage() float64 {
+	bufSize := int(e.config.BufferSize)
+	used := e.ringBuf.Len()
+	return float64(used) / float64(bufSize)
 }
