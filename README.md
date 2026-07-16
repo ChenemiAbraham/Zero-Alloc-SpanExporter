@@ -20,7 +20,7 @@
 ### Install
 
 ```bash
-go install github.com/yourusername/ltt/cmd/ltt@latest
+go install github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/cmd/ltt@latest
 ```
 
 ### Add to your Go app
@@ -29,7 +29,7 @@ go install github.com/yourusername/ltt/cmd/ltt@latest
 import (
     "go.opentelemetry.io/otel"
     "go.opentelemetry.io/otel/sdk/trace"
-    "github.com/yourusername/ltt/pkg/exporter"
+    "github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/exporter"
 )
 
 func main() {
@@ -147,8 +147,8 @@ BenchmarkTUIRender-8             1,000,000    1,234 ns/op   256 B/op  2 allocs/o
 ### Build from source
 
 ```bash
-git clone https://github.com/yourusername/ltt.git
-cd ltt
+git clone https://github.com/ChenemiAbraham/Zero-Alloc-SpanExporter.git
+cd Zero-Alloc-SpanExporter
 go build -o ltt ./cmd/ltt
 ```
 
