@@ -3,7 +3,7 @@ package viewer
 import (
 	"time"
 
-	"github.com/yourusername/ltt/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
 )
 
 // TraceTree represents a hierarchical trace structure

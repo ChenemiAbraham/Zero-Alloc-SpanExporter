@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/yourusername/ltt/pkg/exporter"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/exporter"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"

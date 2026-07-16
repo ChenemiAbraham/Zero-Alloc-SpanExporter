@@ -5,8 +5,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yourusername/ltt/pkg/exporter"
-	"github.com/yourusername/ltt/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/exporter"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
 )
 
 // Model represents the Bubbletea application model

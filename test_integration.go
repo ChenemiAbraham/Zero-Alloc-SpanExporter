@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/yourusername/ltt/pkg/exporter"
-	"github.com/yourusername/ltt/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/exporter"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

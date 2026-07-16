@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yourusername/ltt/internal/ringbuf"
-	"github.com/yourusername/ltt/pkg/protocol"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/internal/ringbuf"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/protocol"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 

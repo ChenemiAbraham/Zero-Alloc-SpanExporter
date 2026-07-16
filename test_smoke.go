@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourusername/ltt/pkg/exporter"
+	"github.com/ChenemiAbraham/Zero-Alloc-SpanExporter/pkg/exporter"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )

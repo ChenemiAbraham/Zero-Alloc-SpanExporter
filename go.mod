@@ -1,4 +1,4 @@
-module github.com/yourusername/ltt
+module github.com/ChenemiAbraham/Zero-Alloc-SpanExporter
 
 go 1.23
 
