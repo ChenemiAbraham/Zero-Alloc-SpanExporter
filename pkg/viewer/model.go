@@ -2,6 +2,7 @@ package viewer
 
 import (
 	"context"
+	"net"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -187,9 +188,28 @@ func (m *Model) toggleExpanded() {
 }
 
 // connectSocket connects to the socket and starts reading
+// Retries connection with exponential backoff
 func (m *Model) connectSocket() tea.Cmd {
 	return func() tea.Msg {
-		conn, err := exporter.Dial(m.socketPath)
+		// Retry connection up to 10 times with backoff
+		var conn net.Conn
+		var err error
+
+		for i := 0; i < 10; i++ {
+			conn, err = exporter.Dial(m.socketPath)
+			if err == nil {
+				// Connection successful
+				break
+			}
+
+			// Exponential backoff: 100ms, 200ms, 400ms, 800ms...
+			backoff := time.Duration(100*(1<<uint(i))) * time.Millisecond
+			if backoff > 5*time.Second {
+				backoff = 5 * time.Second
+			}
+			time.Sleep(backoff)
+		}
+
 		if err != nil {
 			return errorMsg{err}
 		}
